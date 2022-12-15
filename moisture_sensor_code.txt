@@ -1,0 +1,247 @@
+
+//////////////////////////////////////////////////////// LIBRARIES //////////////////////////////////////////////////////////
+// This #include statement was automatically added by the Particle IDE.
+#include <blynk.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <HttpClient.h>
+#include "application.h"
+// This #include statement was automatically added by the Particle IDE.
+#include <Grove_Temperature_And_Humidity_Sensor.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <Grove_ChainableLED.h>
+//////////////////////////////////////////////////////// CONNECTIONS //////////////////////////////////////////////////////////
+int Moisture_Sensor_Pin = A0;
+#define DHTPIN D2 // set pin
+//////////////////////////////////////////////////////// LOGICAL OPERATION VARIBALES //////////////////////////////////////////////////////////
+DHT dht(DHTPIN);
+
+
+// Keep this API Key value to be compatible with the PHP code provided in the project page.
+// If you change the apiKeyValue value, the PHP file /post-data.php also needs to have the same key
+String apiKeyValue = "TC-f9gRquL3Hh4oh4Zdhxv7E5XpXwb3F";
+
+
+#define NUM_LEDS 1
+
+unsigned int nextTime = 0; // Next time to contact the server
+HttpClient http;
+
+// Headers currently need to be set at init, useful for API keys etc.
+http_header_t headers[] = {
+// { "Content-Type", "application/json" },
+// { "Accept" , "application/json" },
+{ "Accept" , "*/*"},
+{ NULL, NULL } // NOTE: Always terminate headers will NULL
+};
+http_request_t request;
+http_response_t response;
+
+
+ChainableLED leds(D4, D5, NUM_LEDS);
+
+unsigned long previousMillis = 0; // will store last time LED was updated
+unsigned long previousMillis2 = 0; // will store last time LED was updated
+unsigned long previousMillis3 = 0; // will store last time LED was updated
+unsigned long previousMillis4 = 0; // will store last time LED was updated
+
+
+double Temperature = 0;
+double Humidity = 0;
+
+int Moisture_Sensor_ADC = 0;
+int Moisture_Sensor = 0;
+
+int counter = 0;
+
+void setup() {
+Serial.begin(115200); //One of standard baud rate for serial communications. Using this for troubleshooting
+Serial.println("Setup Stage");
+DHT11_Setup_Stage();
+Moisture_Setup_Stage();
+RGB_Setup_Stage();
+}
+
+void loop() {
+unsigned long currentMillis = millis();
+
+
+if (currentMillis - previousMillis >= 1000) { //1000 means 1 second// Task 1:- Readng temp amd humidity from DHT11
+// save the last time you blinked the LED
+previousMillis = currentMillis; 
+DHT11_Loop_Stage();
+
+}
+
+if (currentMillis - previousMillis2 >= 1000) {// Task 2:- Reading the moisture sensor
+// save the last time you blinked the LED
+previousMillis2 = currentMillis;
+Moisture_Loop_Stage();
+}
+
+if (currentMillis - previousMillis3 >= 250) {//Task 3:- Operating the LED
+// save the last time you blinked the LED
+previousMillis3 = currentMillis;
+RGB_Loop_Stage();
+}
+
+if (currentMillis - previousMillis4 >= 1000) {//Task 4: Communicating Temp, himudity and moisture with Blynk IoT
+// save the last time you blinked the LED
+previousMillis4 = currentMillis;
+Communicating_With_Cloud();
+
+
+}
+
+
+
+
+}
+
+void Communicating_With_Cloud(){
+
+if (counter >= 4){
+counter = 0;
+} else {
+counter = counter +1;
+Serial.print("counter: ");
+Serial.println(counter);
+}
+
+if (counter == 1){
+
+
+Serial.println("Communicating with Blynk IOT");
+// Request path and body can be set at runtime or at setup.
+request.hostname = "ny3.blynk.cloud";
+request.port = 80;
+request.path = "/external/api/update?token="+ apiKeyValue + "&v1" + String(Moisture_Sensor);
+
+// The library also supports sending a body with your request:
+//request.body = "{\"key\":\"value\"}";
+
+// Get request
+http.get(request, response, headers);
+Serial.print("Application>\tResponse status: ");
+Serial.println(response.status); //200 is okay, 404 not found
+
+Serial.print("Application>\tHTTP Response Body: ");
+Serial.println(response.body);
+
+} else if (counter == 2){
+
+
+Serial.println("Communicating with Blynk IOT");
+// Request path and body can be set at runtime or at setup.
+request.hostname = "ny3.blynk.cloud";
+request.port = 80;
+request.path = "/external/api/update?token="+ apiKeyValue + "&v2" + String(Temperature);
+
+// The library also supports sending a body with your request:
+//request.body = "{\"key\":\"value\"}";
+
+// Get request
+http.get(request, response, headers);
+Serial.print("Application>\tResponse status: ");
+Serial.println(response.status);
+
+Serial.print("Application>\tHTTP Response Body: ");
+Serial.println(response.body);
+
+} else if (counter == 3){
+
+
+Serial.println("Communicating with Blynk IOT");
+// Request path and body can be set at runtime or at setup.
+request.hostname = "ny3.blynk.cloud";
+request.port = 80;
+request.path = "/external/api/update?token="+ apiKeyValue + "&v3" + String(Humidity);
+
+// The library also supports sending a body with your request:
+//request.body = "{\"key\":\"value\"}";
+
+// Get request
+http.get(request, response, headers);
+Serial.print("Application>\tResponse status: ");
+Serial.println(response.status);
+
+Serial.print("Application>\tHTTP Response Body: ");
+Serial.println(response.body);
+
+}
+
+
+}
+
+
+void RGB_Setup_Stage(){
+leds.init();
+}
+
+void RGB_Loop_Stage(){
+
+if (Moisture_Sensor >= 65){
+int colorR = 0;
+int colorG = 255;//maximum brightness for the green color which is what we want to use
+int colorB = 0;
+leds.setColorRGB(0, colorR, colorG, colorB);
+} else {
+int colorR = 0;
+int colorG = 0;
+int colorB = 0;
+leds.setColorRGB(0, colorR, colorG, colorB);
+}
+
+
+}
+
+
+
+void Moisture_Setup_Stage(){
+pinMode(Moisture_Sensor_Pin,INPUT);
+}
+
+void Moisture_Loop_Stage(){
+Moisture_Sensor_ADC = analogRead(Moisture_Sensor_Pin); // Transmitting the moisture sensor reading and converting from analog .0 to 4092// 3.3 v -> 4092 // 1.7 -> 4092/2/
+Moisture_Sensor = map(Moisture_Sensor_ADC, 0 , 4092, 0 , 100);// converting reading into percnetage 
+Serial.print("Moisture_Sensor: ");
+Serial.print(Moisture_Sensor);
+
+}
+
+void DHT11_Setup_Stage(){
+Serial.println("DHT11 Begin!!!");
+
+dht.begin();
+}
+
+void DHT11_Loop_Stage(){
+
+//Read Humidity
+float h = dht.getHumidity();
+// Read temperature as Celsius
+float t = dht.getTempCelcius();
+Temperature = t;
+// Read temperature as Farenheit
+float f = dht.getTempFarenheit();
+Humidity = h;
+
+// Check if any reads failed
+if (isnan(h) || isnan(t) || isnan(f))
+{
+Serial.println("Failed to read from DHT11 sensor!");
+return;
+}
+
+Serial.print("Humid: ");
+Serial.print(h);
+Serial.println("% ");
+Serial.print("Temp: ");
+Serial.print(t);
+Serial.println("*C ");
+Serial.print("Temp: ");
+Serial.print(f);
+Serial.println("*F ");
+Serial.println();Serial.println();
+}  
